@@ -21,3 +21,12 @@ macro_rules! err {
         InjectorError::Other(format!($($t)+))
     };
 }
+
+#[macro_export]
+macro_rules! last_err {
+    () => {
+        $crate::error::InjectorError::Win32Error(unsafe {
+            windows_sys::Win32::Foundation::GetLastError()
+        })
+    };
+}
