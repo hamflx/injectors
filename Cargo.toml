@@ -1,9 +1,9 @@
 [package]
-name = "injector"
+name = "injectors"
 version = "0.1.0"
 edition = "2021"
 description = "远程线程注入的封装"
-repository = "https://github.com/hamflx/injector"
+repository = "https://github.com/hamflx/injectors"
 license = "MIT"
 
 [dependencies]
