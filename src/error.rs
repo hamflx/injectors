@@ -18,7 +18,7 @@ pub type InjectorResult<T> = Result<T, InjectorError>;
 #[macro_export]
 macro_rules! err {
     ($($t:tt)+) => {
-        InjectorError::Other(format!($($t)+))
+        $crate::error::InjectorError::Other(format!($($t)+))
     };
 }
 

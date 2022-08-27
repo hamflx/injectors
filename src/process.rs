@@ -1,6 +1,6 @@
 use std::{
     ffi::c_void,
-    mem::{size_of_val, transmute, MaybeUninit},
+    mem::{size_of_val, MaybeUninit},
     ptr,
     slice::from_raw_parts,
 };
@@ -55,7 +55,7 @@ impl ProcessHandle {
         let kernel32 = Library::from_filename("kernel32.dll")?;
         let load_library = kernel32.find_procedure("LoadLibraryW")?;
         let load_thread = RemoteThrad::new(self, load_library.address(), unsafe {
-            transmute(library_name_addr)
+            &*(library_name_addr as *const ())
         })?;
         load_thread.wait()?;
         let remote_target_lib_base = load_thread.exit_code()?;
@@ -83,7 +83,7 @@ impl ProcessHandle {
         let hook_thread = RemoteThrad::new(
             self,
             enable_hook.offset() + remote_target_lib_base as usize,
-            unsafe { transmute(enable_hook_params) },
+            unsafe { &*(enable_hook_params as *const ()) },
         )?;
         hook_thread.wait()?;
 

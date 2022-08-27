@@ -6,11 +6,7 @@ use windows_sys::Win32::{
     System::LibraryLoader::{FreeLibrary, GetModuleFileNameW, GetProcAddress, LoadLibraryW},
 };
 
-use crate::{
-    err,
-    error::{InjectorError, InjectorResult},
-    last_err,
-};
+use crate::{err, error::InjectorResult, last_err};
 
 pub struct Library(HINSTANCE);
 
