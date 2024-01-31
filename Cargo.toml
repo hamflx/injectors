@@ -1,6 +1,6 @@
 [package]
 name = "injectors"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 description = "远程线程注入的封装"
 repository = "https://github.com/hamflx/injectors"
