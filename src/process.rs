@@ -47,6 +47,7 @@ impl ProcessHandle {
 
         let target_lib = Library::from_filename(library_name)?;
 
+        // 分配注入的 DLL 的完整路径的内存。
         let full_path = target_lib.full_path()?;
         let library_name_addr = self.write_process_memory(unsafe {
             from_raw_parts(
@@ -54,13 +55,28 @@ impl ProcessHandle {
                 full_path.len() * size_of_val(&full_path.as_slice()[0]),
             )
         })?;
+
+        // 找到 LoadLibrary，并执行它，加载注入的 DLL。
         let kernel32 = Library::from_filename("kernel32.dll")?;
         let load_library = kernel32.find_procedure("LoadLibraryW")?;
         let load_thread = RemoteThread::new(self, load_library.address(), unsafe {
             &*(library_name_addr as *const ())
         })?;
         load_thread.wait()?;
-        let remote_target_lib_base = load_thread.exit_code()?;
+
+        // 查询注入的 DLL 的地址。
+        let modules = self.list_process_modules()?;
+        let target_lib_base_name = std::path::Path::new(library_name)
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_lowercase();
+        let module = modules
+            .iter()
+            .find(|m| m.base_name().unwrap() == target_lib_base_name)
+            .ok_or_else(|| InjectorError::ModuleUnloaded)?;
+        let remote_target_lib_base = module.base();
         if remote_target_lib_base == 0 {
             return Err(err!("Remote LoadLibraryW failed"));
         }

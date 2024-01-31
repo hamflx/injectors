@@ -14,6 +14,10 @@ impl<'p> ProcessModule<'p> {
         Self(process, module)
     }
 
+    pub fn base(&self) -> HMODULE {
+        self.1
+    }
+
     pub fn base_name(&self) -> InjectorResult<String> {
         let mut module_name = [0u16; 4096];
         let n = unsafe {
