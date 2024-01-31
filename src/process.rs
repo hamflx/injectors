@@ -5,7 +5,7 @@ use std::{
     slice::from_raw_parts,
 };
 
-use log::info;
+use log::{info, warn};
 use windows_sys::Win32::{
     Foundation::{HANDLE, HMODULE},
     System::{
@@ -211,12 +211,22 @@ impl<'p> Drop for InjectionGuard<'p> {
         let free = || -> InjectorResult<()> {
             let kernel32 = Library::from_filename("kernel32.dll")?;
             let free_library = kernel32.find_procedure("FreeLibrary")?;
+            info!("Free module: 0x{:x}", self.module.base());
             let free_thread = RemoteThread::new(self.process, free_library.address(), unsafe {
                 &*(self.module.base() as *const ())
             })?;
             free_thread.wait()?;
             Ok(())
         };
-        let _ = free();
+        match free() {
+            Ok(_) => info!("Free library successfully"),
+            Err(err) => match err.code() {
+                Some(code) => warn!(
+                    "Free library failed: {}",
+                    std::io::Error::from_raw_os_error(code as _)
+                ),
+                None => warn!("Free library failed: {}", err),
+            },
+        };
     }
 }
