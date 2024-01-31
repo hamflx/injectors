@@ -7,9 +7,9 @@ use windows_sys::Win32::{
 
 use crate::{error::InjectorResult, last_err, process::ProcessHandle};
 
-pub struct RemoteThrad<'process>(&'process ProcessHandle, HANDLE);
+pub struct RemoteThread<'process>(&'process ProcessHandle, HANDLE);
 
-impl<'process> RemoteThrad<'process> {
+impl<'process> RemoteThread<'process> {
     pub fn new(process: &'process ProcessHandle, addr: usize, param: &()) -> InjectorResult<Self> {
         let thread_handle = unsafe {
             CreateRemoteThread(
@@ -45,7 +45,7 @@ impl<'process> RemoteThrad<'process> {
     }
 }
 
-impl<'process> Drop for RemoteThrad<'process> {
+impl<'process> Drop for RemoteThread<'process> {
     fn drop(&mut self) {
         unsafe { CloseHandle(self.1) };
     }

@@ -1,16 +1,17 @@
 use std::{
     ffi::c_void,
     mem::{size_of_val, MaybeUninit},
-    ptr,
+    ptr::{self, null_mut},
     slice::from_raw_parts,
 };
 
 use log::info;
 use windows_sys::Win32::{
-    Foundation::HANDLE,
+    Foundation::{HANDLE, HMODULE},
     System::{
         Diagnostics::Debug::{WriteProcessMemory, PROCESSOR_ARCHITECTURE_INTEL},
         Memory::{VirtualAllocEx, MEM_COMMIT, MEM_RESERVE, PAGE_EXECUTE_READWRITE},
+        ProcessStatus::EnumProcessModules,
         SystemInformation::{GetNativeSystemInfo, SYSTEM_INFO},
         Threading::{GetCurrentProcess, IsWow64Process},
     },
@@ -21,14 +22,15 @@ use crate::{
     error::{InjectorError, InjectorResult},
     last_err,
     library::Library,
+    module::ProcessModule,
     options::{InjectOptions, INJECT_OPTIONS_WRAPPER},
-    thread::RemoteThrad,
+    thread::RemoteThread,
 };
 
 pub struct ProcessHandle(pub(crate) HANDLE);
 
 impl ProcessHandle {
-    pub fn currrent() -> Self {
+    pub fn current() -> Self {
         Self(unsafe { GetCurrentProcess() })
     }
 
@@ -54,7 +56,7 @@ impl ProcessHandle {
         })?;
         let kernel32 = Library::from_filename("kernel32.dll")?;
         let load_library = kernel32.find_procedure("LoadLibraryW")?;
-        let load_thread = RemoteThrad::new(self, load_library.address(), unsafe {
+        let load_thread = RemoteThread::new(self, load_library.address(), unsafe {
             &*(library_name_addr as *const ())
         })?;
         load_thread.wait()?;
@@ -80,7 +82,7 @@ impl ProcessHandle {
             ptr::null()
         };
         let enable_hook = target_lib.find_procedure("enable_hook")?;
-        let hook_thread = RemoteThrad::new(
+        let hook_thread = RemoteThread::new(
             self,
             enable_hook.offset() + remote_target_lib_base as usize,
             unsafe { &*(enable_hook_params as *const ()) },
@@ -92,7 +94,7 @@ impl ProcessHandle {
 
     pub fn check_arch(&self) -> InjectorResult<()> {
         let is_target_x86 = self.is_process_x86()?;
-        let is_self_x86 = Self::currrent().is_process_x86()?;
+        let is_self_x86 = Self::current().is_process_x86()?;
         if is_target_x86 != is_self_x86 {
             return Err(InjectorError::ArchMismatch(
                 if is_target_x86 {
@@ -150,5 +152,32 @@ impl ProcessHandle {
             return Err(last_err!());
         }
         Ok(target_address)
+    }
+
+    pub fn list_process_modules(&self) -> InjectorResult<Vec<ProcessModule>> {
+        let mut needed = 0;
+        let ret = unsafe { EnumProcessModules(self.0, null_mut(), 0, &mut needed) };
+        if ret == 0 {
+            return Err(last_err!());
+        }
+        let mut buf = vec![0u8; needed as usize];
+        let ret = unsafe { EnumProcessModules(self.0, buf.as_mut_ptr() as _, needed, &mut needed) };
+        if ret == 0 {
+            return Err(last_err!());
+        }
+        const MODULE_HANDLE_SIZE: usize = std::mem::size_of::<HMODULE>();
+        let modules = buf
+            .chunks(MODULE_HANDLE_SIZE)
+            .filter_map(|buf| {
+                let mut handle = [0u8; MODULE_HANDLE_SIZE];
+                if buf.len() == MODULE_HANDLE_SIZE {
+                    handle.copy_from_slice(buf);
+                    Some(ProcessModule::new(self, HMODULE::from_le_bytes(handle)))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        Ok(modules)
     }
 }

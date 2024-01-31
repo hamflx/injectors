@@ -9,6 +9,8 @@ pub enum InjectorError {
     BincodeError(bincode::Error),
     #[error("Bincode Error")]
     ArchMismatch(&'static str, &'static str),
+    #[error("Encoding Error")]
+    EncodingError,
     #[error("Other Error")]
     Other(String),
 }

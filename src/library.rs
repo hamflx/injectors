@@ -2,13 +2,13 @@ use std::ffi::CString;
 
 use widestring::{WideCStr, WideCString};
 use windows_sys::Win32::{
-    Foundation::HINSTANCE,
+    Foundation::HANDLE,
     System::LibraryLoader::{FreeLibrary, GetModuleFileNameW, GetProcAddress, LoadLibraryW},
 };
 
 use crate::{err, error::InjectorResult, last_err};
 
-pub struct Library(HINSTANCE);
+pub struct Library(HANDLE);
 
 impl Library {
     pub fn from_filename(filename: &str) -> InjectorResult<Self> {
