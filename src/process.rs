@@ -42,7 +42,7 @@ impl ProcessHandle {
         &self,
         opts: &Option<InjectOptions>,
         library_name: &str,
-    ) -> InjectorResult<()> {
+    ) -> InjectorResult<InjectionGuard> {
         self.check_arch()?;
 
         let target_lib = Library::from_filename(library_name)?;
@@ -73,7 +73,7 @@ impl ProcessHandle {
             .unwrap()
             .to_lowercase();
         let module = modules
-            .iter()
+            .into_iter()
             .find(|m| m.base_name().unwrap() == target_lib_base_name)
             .ok_or_else(|| InjectorError::ModuleUnloaded)?;
         let remote_target_lib_base = module.base();
@@ -105,7 +105,10 @@ impl ProcessHandle {
         )?;
         hook_thread.wait()?;
 
-        Ok(())
+        Ok(InjectionGuard {
+            process: self,
+            module,
+        })
     }
 
     pub fn check_arch(&self) -> InjectorResult<()> {
@@ -195,5 +198,25 @@ impl ProcessHandle {
             })
             .collect::<Vec<_>>();
         Ok(modules)
+    }
+}
+
+pub struct InjectionGuard<'p> {
+    process: &'p ProcessHandle,
+    module: ProcessModule<'p>,
+}
+
+impl<'p> Drop for InjectionGuard<'p> {
+    fn drop(&mut self) {
+        let free = || -> InjectorResult<()> {
+            let kernel32 = Library::from_filename("kernel32.dll")?;
+            let free_library = kernel32.find_procedure("FreeLibrary")?;
+            let free_thread = RemoteThread::new(self.process, free_library.address(), unsafe {
+                &*(self.module.base() as *const ())
+            })?;
+            free_thread.wait()?;
+            Ok(())
+        };
+        let _ = free();
     }
 }
