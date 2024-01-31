@@ -22,6 +22,15 @@ pub enum InjectorError {
     Other(String),
 }
 
+impl InjectorError {
+    pub fn code(&self) -> Option<WIN32_ERROR> {
+        match self {
+            InjectorError::Win32Error(err) => Some(*err),
+            _ => None,
+        }
+    }
+}
+
 pub type InjectorResult<T> = Result<T, InjectorError>;
 
 #[macro_export]
